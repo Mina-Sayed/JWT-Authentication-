@@ -1,1 +1,2 @@
-console.log('mIna');
+console.log('mina')
+let number
