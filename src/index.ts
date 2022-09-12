@@ -3,7 +3,13 @@ import morgan from 'morgan'
 import helmet from 'helmet'
 import RateLimit from 'express-rate-limit'
 import errorMiddleware from './middleware/error.middleware'
+import config from './config'
 // create a instance of server
+const PORT = config.port || 3000
+
+
+
+
 
 const app = express()
 
@@ -56,7 +62,6 @@ app.use((_req: Request, res: Response) => {
 })
 
 
-const PORT = 3000
 
 app.listen(PORT, () => {
   console.log(`🚀 Server ready at http://localhost:${PORT}`)
