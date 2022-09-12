@@ -18,8 +18,7 @@ module.exports = {
   plugins: ['@typescript-eslint', 'prettier'],
   rules: {
     'prettier/prettier': 2, // means error messages
-    semi: ['error', 'never'],
     quotes: ['error', 'single'],
-    'no-console': 1, // Means warning
+    'no-console': 0, // Means warning
   },
 }
