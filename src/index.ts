@@ -4,12 +4,9 @@ import helmet from 'helmet'
 import RateLimit from 'express-rate-limit'
 import errorMiddleware from './middleware/error.middleware'
 import config from './config'
+import db from './database'
 // create a instance of server
 const PORT = config.port || 3000
-
-
-
-
 
 const app = express()
 
@@ -48,11 +45,20 @@ app.post('/', (req: Request, res: Response) => {
   })
 })
 
-
 app.use(errorMiddleware)
 
-
-
+db.connect().then((client) => {
+  return client
+    .query('SELECT NOW()')
+    .then((res) => {
+      client.release()
+      console.log(res.rows)
+    })
+    .catch((err) => {
+      client.release()
+      console.log(err.stack)
+    })
+})
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({
@@ -60,8 +66,6 @@ app.use((_req: Request, res: Response) => {
       'Ohh You are lost , Read the API Documentation! to find more information 😂',
   })
 })
-
-
 
 app.listen(PORT, () => {
   console.log(`🚀 Server ready at http://localhost:${PORT}`)
