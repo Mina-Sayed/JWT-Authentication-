@@ -1,3 +1,5 @@
+import jwt from 'jsonwebtoken'
+import config from '../config'
 import { NextFunction, Request, Response } from 'express'
 import UserModel from '../models/user.model'
 
@@ -26,7 +28,7 @@ export const getMany = async (
   next: NextFunction
 ) => {
   try {
-    const users = await userModel.getAllUsers()
+    const users = await userModel.getMany()
 
     res.json({
       status: 'success',
@@ -89,5 +91,33 @@ export const deleteOne = async (
     })
   } catch (error) {
     next(error)
+  }
+}
+
+export const authenticate1 = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { email, password } = req.body
+    const user = await userModel.authenticate(email, password)
+    const token = jwt.sign({ user }, config.tokenSecret as unknown as string)
+
+    if (!user) {
+      return res.status(401).json({
+        status: 'error',
+        data: null,
+        message: 'the username and password is not match please try again',
+      })
+    }
+
+    res.json({
+      status: 'success',
+      data: { ...user, token },
+      message: 'User retrieved successfully',
+    })
+  } catch (error) {
+    return next(error)
   }
 }

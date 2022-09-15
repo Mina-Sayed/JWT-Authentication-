@@ -1,85 +1,85 @@
-import User from '../types/user.types'
+import bcrypt from 'bcrypt'
 import db from '../database'
+import User from '../types/user.types'
+import config from '../config'
+
+const hashPassword = (password: string) => {
+  const salt = parseInt(config.saltRound as string, 10)
+  return bcrypt.hashSync(`${password}${config.pepper}`, salt)
+}
 
 class UserModel {
-  // create
-
+  // create new user
   async create(u: User): Promise<User> {
     try {
-      // connect to database
-      const connections = await db.connect()
-      const sql =
-        'INSERT INTO users (email, user_name, first_name, last_name, password) VALUES($1, $2, $3, $4, $5) RETURNING email, user_name, first_name, last_name'
-      // run query
-      const result = await connections.query(sql, [
+      const connection = await db.connect()
+      const sql = `INSERT INTO users (email, user_name, first_name, last_name, password) 
+                  values ($1, $2, $3, $4, $5) 
+                  RETURNING id, email, user_name, first_name, last_name`
+      const result = await connection.query(sql, [
         u.email,
         u.user_name,
         u.first_name,
         u.last_name,
-        u.password,
+        hashPassword(u.password as string),
       ])
-      // relase connections
-      connections.release()
-      // return created user
+      connection.release()
       return result.rows[0]
     } catch (error) {
       throw new Error(
-        `unable to create user ${u.user_name}: ${(error as Error).message}`
+        `Unable to create (${u.user_name}): ${(error as Error).message}`
       )
     }
   }
 
   // get all users
-
-  async getAllUsers(): Promise<User[]> {
+  async getMany(): Promise<User[]> {
     try {
       const connection = await db.connect()
       const sql =
-        'SELECT id,email, user_name, first_name, last_name from users '
+        'SELECT id, email, user_name, first_name, last_name from users'
       const result = await connection.query(sql)
       connection.release()
       return result.rows
     } catch (error) {
-      throw new Error(`Error at retrevieng users: ${(error as Error).message}`)
+      throw new Error(`Error at retrieving users ${(error as Error).message}`)
     }
   }
 
   // get specific user
-
   async getOne(id: string): Promise<User> {
     try {
+      const sql = `SELECT id, email, user_name, first_name, last_name FROM users 
+      WHERE id=($1)`
+
       const connection = await db.connect()
-      const sql =
-        'SELECT id,email,user_name,first_name,last_name FROM users WHERE id = ($1)'
+
       const result = await connection.query(sql, [id])
+
       connection.release()
       return result.rows[0]
     } catch (error) {
-      throw new Error(
-        `Could not found user with id ${id} in database ${
-          (error as Error).message
-        }`
-      )
+      throw new Error(`Could not find user ${id}, ${(error as Error).message}`)
     }
   }
 
-  // update
-
+  // update user
   async updateOne(u: User): Promise<User> {
     try {
       const connection = await db.connect()
-      const sql =
-        'UPDATE users SET email = $1, user_name = $2, first_name = $3, last_name = $4 password=$5 WHERE id = $6 RETURNING id, email, user_name, first_name, last_name'
+      const sql = `UPDATE users 
+                  SET email=$1, user_name=$2, first_name=$3, last_name=$4, password=$5 
+                  WHERE id=$6 
+                  RETURNING id, email, user_name, first_name, last_name`
 
       const result = await connection.query(sql, [
         u.email,
         u.user_name,
         u.first_name,
         u.last_name,
-        u.password,
+        hashPassword(u.password as string),
         u.id,
       ])
-
       connection.release()
       return result.rows[0]
     } catch (error) {
@@ -89,22 +89,52 @@ class UserModel {
     }
   }
 
-  // delete
+  // delete user
   async deleteOne(id: string): Promise<User> {
     try {
       const connection = await db.connect()
-      const sql = `DELETE FROM users WHERE id = ${id} RETURNING id,email,user_name,first_name,last_name`
+      const sql = `DELETE FROM users 
+                  WHERE id=($1) 
+                  RETURNING id, email, user_name, first_name, last_name`
+
       const result = await connection.query(sql, [id])
+
       connection.release()
+
       return result.rows[0]
     } catch (error) {
       throw new Error(
-        `Could not delete user ${id} , ${(error as Error).message}`
+        `Could not delete user ${id}, ${(error as Error).message}`
       )
     }
   }
 
-  // auhtenticate users
+  // authenticate
+  async authenticate(email: string, password: string): Promise<User | null> {
+    try {
+      const connection = await db.connect()
+      const sql = 'SELECT password FROM users WHERE email=$1'
+      const result = await connection.query(sql, [email])
+      if (result.rows.length) {
+        const { password: hashPassword } = result.rows[0]
+        const isPasswordValid = bcrypt.compareSync(
+          `${password}${config.pepper}`,
+          hashPassword
+        )
+        if (isPasswordValid) {
+          const userInfo = await connection.query(
+            'SELECT id, email, user_name, first_name, last_name FROM users WHERE email=($1)',
+            [email]
+          )
+          return userInfo.rows[0]
+        }
+      }
+      connection.release()
+      return null
+    } catch (error) {
+      throw new Error(`Unable to login: ${(error as Error).message}`)
+    }
+  }
 }
 
 export default UserModel
